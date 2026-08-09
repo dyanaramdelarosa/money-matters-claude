@@ -18,8 +18,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",
+    "allauth",
+    "allauth.account",
+    "django_tailwind_cli",
     "apps.core",
+    "apps.users",
 ]
+
+SITE_ID = 1
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -28,8 +35,14 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -70,7 +83,11 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+STATICFILES_DIRS = [BASE_DIR / "assets"]
+
+# django-tailwind-cli: keep the committed source CSS outside STATICFILES_DIRS so it's
+# never picked up as a static asset itself; only the compiled output (in assets/) is.
+TAILWIND_CLI_SRC_CSS = "theme/source.css"
 
 STORAGES = {
     "default": {
@@ -82,3 +99,19 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# django-allauth: email-only login, no separate username, no email verification for v1
+# (see CLAUDE.md Architecture section for rationale). Rate limiting on login/signup/
+# password-reset uses allauth's secure-by-default ACCOUNT_RATE_LIMITS — left unset here
+# to keep its defaults.
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "users:profile"
+ACCOUNT_LOGOUT_REDIRECT_URL = "account_login"
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_FORMS = {"signup": "apps.users.forms.SignupForm"}
+
+DEFAULT_FROM_EMAIL = env(
+    "DJANGO_DEFAULT_FROM_EMAIL", default="MoneyMatters <noreply@moneymatters.local>"
+)

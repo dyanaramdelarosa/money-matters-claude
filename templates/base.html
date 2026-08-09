@@ -1,0 +1,43 @@
+{% load tailwind_cli %}<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% block head_title %}MoneyMatters{% endblock %}</title>
+        {% tailwind_css %}
+        <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        {% block extra_head %}
+        {% endblock extra_head %}
+    </head>
+    <body class="h-full">
+        {% block body %}
+            <nav class="border-b border-slate-200 bg-white">
+                <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+                    <a href="{% url 'users:profile' %}" class="text-lg font-semibold text-slate-900">MoneyMatters</a>
+                    <ul class="flex items-center gap-4 text-sm">
+                        {% if user.is_authenticated %}
+                            <li><a href="{% url 'users:profile' %}" class="text-slate-600 hover:text-slate-900">Profile</a></li>
+                            <li><a href="{% url 'account_logout' %}" class="text-slate-600 hover:text-slate-900">Sign Out</a></li>
+                        {% else %}
+                            <li><a href="{% url 'account_login' %}" class="text-slate-600 hover:text-slate-900">Sign In</a></li>
+                            <li><a href="{% url 'account_signup' %}" class="text-slate-600 hover:text-slate-900">Sign Up</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+            {% if messages %}
+                <div class="mx-auto max-w-3xl px-4 pt-4">
+                    {% for message in messages %}
+                        <p class="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <main class="mx-auto max-w-3xl px-4 py-8">
+                {% block content %}
+                {% endblock content %}
+            </main>
+        {% endblock body %}
+        {% block extra_body %}
+        {% endblock extra_body %}
+    </body>
+</html>
