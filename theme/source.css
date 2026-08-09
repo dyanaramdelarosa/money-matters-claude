@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@layer base {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    @apply block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm;
+    @apply focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500;
+  }
+
+  label {
+    @apply mb-1 block text-sm font-medium text-slate-700;
+  }
+
+  form p {
+    @apply mb-4;
+  }
+}

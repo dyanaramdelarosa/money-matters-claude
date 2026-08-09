@@ -152,5 +152,7 @@ These are the parts that must be exactly right.
 7. Admin portal + audit log.
 8. Data export, account deletion, data purge.
 9. Docker Compose, seed data, CLAUDE.md, README.
+10. Social login (Google/Facebook) via `django-allauth`'s `socialaccount` app,
+    on top of the email/password auth built in Milestone 2.
 
 Start with the plan.

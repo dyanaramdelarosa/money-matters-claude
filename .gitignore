@@ -12,6 +12,10 @@ staticfiles/
 media/
 *.log
 
+# Tailwind (django-tailwind-cli): compiled output + downloaded CLI binary
+assets/css/tailwind.css
+.django_tailwind_cli/
+
 # Env / secrets
 .env
 
