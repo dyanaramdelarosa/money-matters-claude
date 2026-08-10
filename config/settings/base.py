@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     "django_tailwind_cli",
     "apps.core",
     "apps.users",
+    "apps.categories",
+    "apps.accounts",
 ]
 
 SITE_ID = 1

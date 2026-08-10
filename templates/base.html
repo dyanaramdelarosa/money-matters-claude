@@ -16,6 +16,8 @@
                     <a href="{% url 'users:profile' %}" class="text-lg font-semibold text-slate-900">MoneyMatters</a>
                     <ul class="flex items-center gap-4 text-sm">
                         {% if user.is_authenticated %}
+                            <li><a href="{% url 'accounts:list' %}" class="text-slate-600 hover:text-slate-900">Accounts</a></li>
+                            <li><a href="{% url 'categories:list' %}" class="text-slate-600 hover:text-slate-900">Categories</a></li>
                             <li><a href="{% url 'users:profile' %}" class="text-slate-600 hover:text-slate-900">Profile</a></li>
                             <li><a href="{% url 'account_logout' %}" class="text-slate-600 hover:text-slate-900">Sign Out</a></li>
                         {% else %}

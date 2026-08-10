@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block head_title %}{{ account.name }}{% endblock %}
+
+{% block content %}
+    <h1 class="mb-6 text-2xl font-semibold text-slate-900">{{ account.name }}</h1>
+    <dl class="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Type</dt>
+            <dd class="text-sm text-slate-900">{{ account.get_type_display }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Currency</dt>
+            <dd class="text-sm text-slate-900">{{ account.currency }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Opening balance</dt>
+            <dd class="text-sm text-slate-900">{{ account.opening_balance }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Current balance</dt>
+            <dd class="text-sm text-slate-900">{{ account.balance }}</dd>
+        </div>
+    </dl>
+    <div class="mt-4 text-sm">
+        <a href="{% url 'accounts:edit' account.pk %}" class="text-indigo-600 hover:underline">Edit</a>
+        <a href="{% url 'accounts:list' %}" class="ml-4 text-slate-500 hover:underline">Back to accounts</a>
+    </div>
+{% endblock content %}

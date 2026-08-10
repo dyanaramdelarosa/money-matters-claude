@@ -18,7 +18,7 @@ uv run python manage.py tailwind build
 uv run python manage.py runserver
 ```
 
-Visit `http://127.0.0.1:8000/accounts/signup/` to create a user (pick an email,
+Visit `http://127.0.0.1:8000/auth/signup/` to create a user (pick an email,
 password, and base currency — there's no `createsuperuser`-provisioned default
 account). You'll land on `/profile/` after signing up. Password-reset emails print to
 the terminal in dev (console email backend) instead of actually sending.
