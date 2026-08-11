@@ -154,5 +154,62 @@ These are the parts that must be exactly right.
 9. Docker Compose, seed data, CLAUDE.md, README.
 10. Social login (Google/Facebook) via `django-allauth`'s `socialaccount` app,
     on top of the email/password auth built in Milestone 2.
+11. Index page: `/` routes anonymous visitors to the login page and
+    authenticated users to the dashboard. Built after Milestone 6, since it
+    needs the dashboard to exist as its logged-in target.
+12. Custom 404 page: branded, on-theme `templates/404.html` (Tailwind-styled,
+    extends `base.html`) instead of Django's default debug/plain 404, shown
+    whenever `DEBUG=False` — including the cross-user-object lookups that are
+    already 404ing by design (see "Conventions and gotchas" in CLAUDE.md).
+
+## Decisions made during implementation
+
+The items this spec left open ("choose and justify", "state which and enforce", etc.)
+were resolved via an interview at the start of each milestone. Recorded here for
+reference; full rationale for each lives in `CLAUDE.md`.
+
+### Milestone 1 (Scaffold)
+- Frontend: Django templates + HTMX + Alpine.js + Tailwind (server-rendered), compiled
+  via `django-tailwind-cli` (pip-only standalone binary — no Node/npm toolchain).
+- Auth: `django-allauth`.
+- Production database in Compose: Postgres everywhere it matters (Docker Compose dev
+  override + prod, and CI) via `DATABASE_URL`. SQLite remains only the fallback for a
+  quick non-Docker local run — this is the resolution of the SQLite-dev/Postgres-prod
+  drift-risk flag.
+- Test helpers: `factory-boy` + `freezegun`.
+- Domain app breakdown: `core`, `users`, `accounts`, `categories`, `transactions`,
+  `budgets`, `analytics`, `audit` — one Django app per bounded context.
+- Charting library: not yet decided — deferred to Milestone 6, when the analytics
+  dashboard is actually built.
+
+### Milestone 2 (Auth + users + profile)
+- Social login (Google/Facebook) is wanted, but built as a separate, later milestone
+  (see Milestone 10 above) rather than alongside plain email/password auth.
+- Email verification: none required to log in (`ACCOUNT_EMAIL_VERIFICATION = "none"`).
+- Login identifier: email only, no separate username field.
+- Base currency: chosen by the user at signup, stored on `Profile` — this is what the
+  Money section's "restrict a user to a single currency" is enforced against.
+
+### Milestone 3 (Accounts + categories CRUD)
+- Account/Category deletion: archive/soft-delete (`is_archived` + `archived_at`), not
+  blocking delete — this is the resolution of the Accounts section's "decide... state
+  which" instruction. Applied consistently to both Accounts and Categories.
+- Account type: fixed choices — `CASH`, `BANK`, `E_WALLET`, `CREDIT_CARD`, `OTHER`.
+- Category kind: split into `EXPENSE` / `INCOME` from the start, ahead of when it's
+  strictly needed — sets up Milestone 4's transaction-category validation and the
+  Analytics section's per-kind reporting without a later migration/backfill.
+- UI for this milestone: plain full-page Django CRUD, no HTMX yet. HTMX usage is
+  expected to start once there's a clearer payoff (e.g. Transactions or the dashboard).
+- Post-milestone fix: the `unique(user, name)` constraint on both Account and Category
+  was scoped to active rows only (`condition=Q(is_archived=False)`), since a global
+  constraint blocked reusing a name after archiving — e.g. archiving "Wallet" then
+  creating a new "Wallet" raised `IntegrityError`. Archived rows keep their original
+  name for history; only active rows must be unique per user.
+- Post-milestone fix: that DB constraint alone still let name conflicts crash with a raw
+  `IntegrityError` (Django's automatic unique-constraint form validation skips fields
+  excluded from the form, and `user` isn't a form field). Added explicit `clean_name()`
+  validation (`apps.core.forms.UniqueActiveNameFormMixin`) so a conflict is a normal form
+  error, surfaced via an Alpine.js modal (`templates/partials/form_errors_modal.html`)
+  rather than a crash or a silent inline-only error.
 
 Start with the plan.

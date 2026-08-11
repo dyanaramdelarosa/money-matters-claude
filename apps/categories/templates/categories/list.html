@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block head_title %}Categories{% endblock %}
+
+{% block content %}
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold text-slate-900">Categories</h1>
+        <a href="{% url 'categories:create' %}" class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">New Category</a>
+    </div>
+
+    {% if categories %}
+        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <table class="w-full table-fixed divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="w-[55%] px-6 py-3 text-left font-medium text-slate-500">Name</th>
+                        <th class="w-[25%] px-6 py-3 text-left font-medium text-slate-500">Kind</th>
+                        <th class="w-[20%] px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for category in categories %}
+                        <tr>
+                            <td class="px-6 py-3 truncate">{{ category.name }}</td>
+                            <td class="px-6 py-3">{{ category.get_kind_display }}</td>
+                            <td class="px-6 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'categories:edit' category.pk %}" class="text-slate-500 hover:text-slate-800">Edit</a>
+                                <form method="post" action="{% url 'categories:archive' category.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="ml-2 text-slate-500 hover:text-red-600">Archive</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-sm text-slate-600">No categories yet.</p>
+    {% endif %}
+{% endblock content %}

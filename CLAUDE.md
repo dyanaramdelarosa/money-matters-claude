@@ -13,16 +13,24 @@
 5. Prefer boring, idiomatic Django over clever abstractions. No premature
    microservices, no custom ORM layers, no dependency I haven't approved
    unless you flag it and say why.
+6. Keep documentation in lockstep with the code, not as a batch step at the
+   end. When a milestone changes or resolves something `specs.md` left open,
+   update `specs.md`'s "Decisions made during implementation" section as part
+   of that milestone's work. Same for `CLAUDE.md` (architecture, directory
+   layout, conventions) and `README.md` — update them as changes land, not
+   retroactively.
 
-## Architecture (as of Milestone 2)
+## Architecture (as of Milestone 3)
 
 - **Frontend**: server-rendered Django templates + HTMX + Alpine.js + Tailwind.
   DRF/SPA was rejected: this is a CRUD app and a separate API layer doubles
   the surface area for no benefit. Tailwind is compiled via `django-tailwind-cli`
-  (standalone binary, no Node/npm) — see "Tailwind" below. HTMX isn't
-  functionally wired in yet (no middleware, no partial-update views); auth
-  pages are plain full-page POST/redirect. First real HTMX usage is planned
-  for Milestone 3 (Accounts CRUD), where inline partial updates pay off.
+  (standalone binary, no Node/npm) — see "Tailwind" below. HTMX still isn't
+  functionally wired in (no middleware, no partial-update views) — Accounts/
+  Categories CRUD (Milestone 3) deliberately stayed plain full-page Django
+  views to keep focus on the balance-invariant logic. First real HTMX usage
+  is now expected in Milestone 4 (Transactions) or the Milestone 6 dashboard,
+  wherever the payoff is clearest.
 - **Auth**: `django-allauth`, email/password only, no username field
   (`ACCOUNT_LOGIN_METHODS = {"email"}`). No email verification required
   (`ACCOUNT_EMAIL_VERIFICATION = "none"`) — there's no transactional email
@@ -41,9 +49,53 @@
   allauth's `socialaccount` add-on layers on top of this without rework.
 - **Currency**: each user picks a `base_currency` at signup, stored on
   `Profile`, validated against a shared `CURRENCY_CHOICES` list in
-  `apps.core.currencies` (hand-maintained ISO-4217 subset, no dependency) —
-  reused by Accounts/Transactions from Milestone 3 onward to enforce the
-  spec's "single currency per user" rule.
+  `apps.core.currencies` (hand-maintained ISO-4217 subset, no dependency).
+  `Account.currency` is never a free-choice form field — it's always set
+  server-side from `request.user.profile.base_currency` (in the create view's
+  `get_form()`, before validation runs) and re-checked by `Account.clean()` —
+  this is what actually enforces the spec's "single currency per user" rule.
+- **Accounts & balance invariants** (Milestone 3): `Account.opening_balance`
+  is immutable after creation (the edit form only exposes `name`/`type`) —
+  treated like the ledger's implicit first entry rather than an ad-hoc
+  rewrite target. `balance` is never a form field; it's set from
+  `opening_balance` on creation and otherwise only moves through
+  `Account.adjust_balance(delta)`, the row-locking primitive
+  (`select_for_update()` inside `transaction.atomic()`) that Milestone 4's
+  transaction writes will call. **`reconcile_balances` is deferred to
+  Milestone 4** — there's no transaction ledger yet to reconcile against;
+  building it now (recomputing against nothing but `opening_balance`) would
+  just mean immediate rework. The concurrency test for `adjust_balance`
+  (`tests/accounts/test_models.py::AdjustBalanceConcurrencyTest`) only runs
+  against Postgres — SQLite has no real row locking and raises "database is
+  locked" under genuine thread contention instead of serializing, so the test
+  self-skips there rather than being flaky or misleading. Both `Account` and
+  `Category` use archive/soft-delete (`is_archived` + `archived_at`), never a
+  hard delete, so future FK references (Transactions) never orphan. The
+  `unique(user, name)` constraint on both models is a *conditional*
+  `UniqueConstraint` (`condition=Q(is_archived=False)`) — scoped to active
+  rows only, so archiving "Wallet" and creating a new active "Wallet" both
+  named at once no longer raises `IntegrityError`; the archived row keeps its
+  original name for history rather than needing a rename-on-archive hack.
+  That DB constraint alone isn't enough for a clean UX: `user` is set
+  server-side (never a form field), and Django's automatic unique-constraint
+  form validation silently skips any constraint touching a field that's
+  excluded from the form — so a name conflict would otherwise bypass
+  validation entirely and surface as a raw `IntegrityError` at `save()`.
+  `apps.core.forms.UniqueActiveNameFormMixin` (used by `AccountCreateForm`,
+  `AccountEditForm`, `CategoryForm`) does the active-name-conflict check
+  explicitly in `clean_name()` against `self.user` (passed in via the view's
+  `get_form_kwargs()`), so it's a normal form error instead. The create/edit
+  templates (`accounts/form.html`, `categories/form.html`) render
+  `partials/form_errors_modal.html` — an Alpine.js modal (`x-data`/`x-show`,
+  closes on Escape/backdrop-click/button) that pops up whenever `form.errors`
+  is non-empty, listing every field error including the name conflict.
+- **Categories**: `Category.kind` (`EXPENSE` | `INCOME`) was split from the
+  start, ahead of when Milestone 4 strictly needs it, to avoid a later
+  migration/backfill. Every new user gets a starter set
+  (`apps/categories/defaults.py`) seeded by a `post_save` signal on the user
+  model, owned by `apps.categories` itself (registered in
+  `CategoriesConfig.ready()`) — `apps.users` has no idea `apps.categories`
+  exists, keeping the dependency one-directional.
 - **Database**: Postgres everywhere it matters — Docker Compose (dev override
   and prod) and CI — via `django-environ`'s `DATABASE_URL`. SQLite
   (`sqlite:///db.sqlite3`) is only the fallback for a quick non-Docker local
@@ -53,10 +105,10 @@
   against Postgres for those.
 - **Domain apps** (one per bounded context; created as their milestone lands,
   not all up front): `core` (shared abstract models/utils — exists),
-  `users` (Profile — exists), `accounts`, `categories` (shared by transactions
-  and budgets — kept separate to avoid a dependency cycle between the two),
-  `transactions`, `budgets`, `analytics` (aggregation only, no models),
-  `audit` (append-only log).
+  `users` (Profile — exists), `accounts` (exists), `categories` (exists;
+  shared by transactions and budgets — kept separate to avoid a dependency
+  cycle between the two), `transactions`, `budgets`, `analytics` (aggregation
+  only, no models), `audit` (append-only log).
 
 ## Tailwind
 
@@ -94,23 +146,42 @@ apps/                   # domain apps live here, one per bounded context
   core/
     models.py           # TimeStampedModel (abstract base: created_at/updated_at)
     currencies.py        # shared CURRENCY_CHOICES (ISO-4217 subset)
+    forms.py              # UniqueActiveNameFormMixin — shared active-name-conflict
+                           #   validation, used by accounts + categories forms
     views.py             # /healthz/
   users/
     models.py            # Profile (OneToOne to auth.User, base_currency)
     forms.py              # SignupForm — adds base_currency, creates Profile
     views.py              # ProfileView (own profile only)
+  accounts/
+    models.py             # Account: type, currency, opening_balance, balance,
+                           #   is_archived; adjust_balance(), archive(), clean()
+    forms.py               # AccountCreateForm (+opening_balance) vs AccountEditForm
+    views.py                # List/Detail/Create/Update/Archive, all user-scoped
+  categories/
+    models.py              # Category: kind (EXPENSE|INCOME), is_archived; archive()
+    defaults.py             # DEFAULT_EXPENSE_CATEGORIES / DEFAULT_INCOME_CATEGORIES
+    signals.py               # post_save(User) -> seeds defaults for every new user
 templates/               # project-level templates, shared across apps
   base.html               # site skeleton: tailwind_css tag, Alpine CDN, nav
+  partials/
+    form_errors_modal.html  # Alpine-driven modal for form.errors — see below
   allauth/                # overrides allauth's own template pack — see "Tailwind"
     layouts/base.html
     elements/*.html
 theme/
   source.css              # Tailwind input (committed); compiles to assets/css/tailwind.css
 tests/                  # all tests live here, mirroring apps/ — not inside each app
+  factories.py            # factory-boy: UserFactory, ProfileFactory, AccountFactory,
+                           #   CategoryFactory — shared across app test subpackages
   core/
     test_healthz.py
   users/
     test_models.py, test_signup.py, test_login_logout.py, test_profile_view.py
+  accounts/
+    test_models.py, test_views.py
+  categories/
+    test_models.py, test_signals.py, test_views.py
 manage.py
 ```
 
@@ -144,10 +215,23 @@ pre-commit run --all-files
   the domain layer.
 - Every user-owned queryset must be filtered by the requesting user; a
   cross-user object lookup should 404, never 403 (see specs.md Security
-  requirements) — this becomes relevant starting Milestone 3. (`ProfileView`
-  in Milestone 2 has no `<pk>` in its URL — it's always "my profile" — so
-  there's no cross-user object-access surface to test yet; Accounts' list/
-  detail-by-pk views are the first real case.)
+  requirements). Delivered starting Milestone 3: every Accounts/Categories
+  view scopes `get_queryset()`/`get_object_or_404()` by `user=request.user`,
+  so a valid pk belonging to another user 404s via Django's normal
+  `get_object_or_404` path — no separate permission-denied branch to
+  maintain. See `tests/accounts/test_views.py` and
+  `tests/categories/test_views.py` for the concrete tests. (`ProfileView` in
+  Milestone 2 has no `<pk>` in its URL — it's always "my profile" — so it
+  had no cross-user surface to test.)
+- **URL namespace**: `django-allauth` is mounted at `/auth/` (not the more
+  common `/accounts/`) specifically to keep it out of the way of the
+  `apps.accounts` (financial Accounts) CRUD app, which owns `/accounts/`.
+  Mounting both under `/accounts/` would work today (their sub-paths happen
+  not to collide) but is exactly the "Account" vs "user account" naming
+  collision the spec calls out avoiding — don't reintroduce it. Everything
+  that references allauth URLs does so by name (`account_login`,
+  `account_signup`, ...) via `reverse()`/`{% url %}`, never a hardcoded path,
+  so the prefix itself can move freely if needed.
 - `apps.core` is the only place for genuinely cross-cutting concerns
   (abstract base models, shared utils). Don't let it become a dumping ground
   for domain logic that belongs in a specific bounded-context app.
@@ -163,3 +247,16 @@ pre-commit run --all-files
   `socialaccount` app (also recorded in `specs.md`'s Milestones list).
   Deferred out of Milestone 2 (plain email/password) — it's additive on top
   of the classic auth flow, not a rework.
+- **Milestone 11: Index page** (`/`) — anonymous visitors go to login,
+  authenticated users go to the dashboard (also recorded in `specs.md`'s
+  Milestones list). Sequenced after Milestone 6, since it needs the
+  dashboard to exist as its logged-in target; there's no `/` route at all
+  yet (only `/healthz/`, `/profile/`, `/accounts/`, `/categories/`, and
+  `/auth/...`).
+- **Milestone 12: Custom 404 page** — a branded `templates/404.html`
+  (also recorded in `specs.md`'s Milestones list), replacing Django's
+  default 404 for both genuinely-missing URLs and the by-design cross-user
+  404s (see the cross-user-404 bullet above). Only takes effect with
+  `DEBUG=False`, so it isn't visible in local dev without explicitly
+  testing it (`DEBUG=False` + a real `ALLOWED_HOSTS` entry, or
+  `config.settings.prod`).
