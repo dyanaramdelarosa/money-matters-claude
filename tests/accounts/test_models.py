@@ -61,6 +61,29 @@ def test_adjust_balance_allows_negative_delta():
     assert account.balance == Decimal("60.00")
 
 
+def test_set_opening_balance_shifts_balance_by_the_delta():
+    account = AccountFactory(opening_balance=Decimal("100.00"))
+
+    account.set_opening_balance(Decimal("150.00"))
+    account.refresh_from_db()
+
+    assert account.opening_balance == Decimal("150.00")
+    assert account.balance == Decimal("150.00")
+
+
+def test_set_opening_balance_after_activity_preserves_existing_effect():
+    account = AccountFactory(opening_balance=Decimal("100.00"))
+    account.adjust_balance(Decimal("-30.00"))
+    account.refresh_from_db()
+    assert account.balance == Decimal("70.00")
+
+    account.set_opening_balance(Decimal("150.00"))
+    account.refresh_from_db()
+
+    assert account.opening_balance == Decimal("150.00")
+    assert account.balance == Decimal("120.00")
+
+
 def test_archive_sets_is_archived_and_archived_at():
     account = AccountFactory()
     assert account.archived_at is None

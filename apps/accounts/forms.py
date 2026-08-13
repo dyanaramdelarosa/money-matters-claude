@@ -19,3 +19,9 @@ class AccountEditForm(UniqueActiveNameFormMixin, forms.ModelForm):
     class Meta:
         model = Account
         fields = ["name", "type"]
+
+
+class AccountOpeningBalanceForm(forms.ModelForm):
+    class Meta:
+        model = Account
+        fields = ["opening_balance"]

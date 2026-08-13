@@ -10,4 +10,9 @@ urlpatterns = [
     path("<int:pk>/", views.AccountDetailView.as_view(), name="detail"),
     path("<int:pk>/edit/", views.AccountUpdateView.as_view(), name="edit"),
     path("<int:pk>/archive/", views.AccountArchiveView.as_view(), name="archive"),
+    path(
+        "<int:pk>/opening-balance/",
+        views.AccountEditOpeningBalanceView.as_view(),
+        name="edit_opening_balance",
+    ),
 ]

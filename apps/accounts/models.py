@@ -77,3 +77,18 @@ class Account(TimeStampedModel):
             locked.balance += delta
             locked.save(update_fields=["balance", "updated_at"])
             self.balance = locked.balance
+
+    def set_opening_balance(self, new_opening_balance):
+        """Corrects the ledger's baseline, not an event in it — shifts the
+        current balance by the same delta so every transaction's recorded
+        effect is left untouched, and reconcile_balances stays consistent
+        without a matching Transaction row.
+        """
+        with transaction.atomic():
+            locked = Account.objects.select_for_update().get(pk=self.pk)
+            delta = new_opening_balance - locked.opening_balance
+            locked.opening_balance = new_opening_balance
+            locked.balance += delta
+            locked.save(update_fields=["opening_balance", "balance", "updated_at"])
+            self.opening_balance = locked.opening_balance
+            self.balance = locked.balance

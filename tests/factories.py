@@ -1,8 +1,12 @@
+from decimal import Decimal
+
 import factory
+from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.accounts.models import Account, AccountType
 from apps.categories.models import Category, CategoryKind
+from apps.transactions.models import Transaction, TransactionType
 from apps.users.models import Profile
 
 
@@ -41,3 +45,16 @@ class CategoryFactory(DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     name = factory.Sequence(lambda n: f"Category {n}")
     kind = CategoryKind.EXPENSE
+
+
+class TransactionFactory(DjangoModelFactory):
+    class Meta:
+        model = Transaction
+
+    user = factory.SubFactory(UserFactory)
+    type = TransactionType.EXPENSE
+    amount = Decimal("10.00")
+    currency = "USD"
+    date = factory.LazyFunction(timezone.localdate)
+    account = factory.SubFactory(AccountFactory, user=factory.SelfAttribute("..user"))
+    category = factory.SubFactory(CategoryFactory, user=factory.SelfAttribute("..user"))

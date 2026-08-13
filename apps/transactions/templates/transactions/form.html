@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block head_title %}{% if form.instance.pk %}Edit Transaction{% else %}New Transaction{% endif %}{% endblock %}
+
+{% block content %}
+    {% include "partials/form_errors_modal.html" %}
+    <h1 class="mb-6 text-2xl font-semibold text-slate-900">
+        {% if form.instance.pk %}Edit Transaction{% else %}New Transaction{% endif %}
+    </h1>
+    <form
+        method="post"
+        x-data="{ type: '{{ form.type.value|default:'EXPENSE' }}' }"
+        class="max-w-lg rounded-lg border border-slate-200 bg-white p-6"
+    >
+        {% csrf_token %}
+
+        <p>
+            {{ form.type.label_tag }}
+            {{ form.type }}
+            {{ form.type.errors }}
+        </p>
+
+        <p>
+            {{ form.date.label_tag }}
+            {{ form.date }}
+            {{ form.date.errors }}
+        </p>
+
+        <p>
+            {{ form.amount.label_tag }}
+            {{ form.amount }}
+            {{ form.amount.errors }}
+        </p>
+
+        <p>
+            {{ form.account.label_tag }}
+            {{ form.account }}
+            {{ form.account.errors }}
+        </p>
+
+        <p x-show="type === 'TRANSFER'" x-cloak>
+            {{ form.transfer_to_account.label_tag }}
+            {{ form.transfer_to_account }}
+            {{ form.transfer_to_account.errors }}
+        </p>
+
+        <p x-show="type !== 'TRANSFER'" x-cloak>
+            <label for="id_category">Category</label>
+            <select name="category" id="id_category" x-show="type === 'EXPENSE'" :disabled="type !== 'EXPENSE'">
+                <option value="">---------</option>
+                {% for cat in form.category.field.queryset %}
+                    {% if cat.kind == "EXPENSE" %}
+                        <option value="{{ cat.pk }}" {% if form.category.value|stringformat:"s" == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <select name="category" x-show="type === 'INCOME'" :disabled="type !== 'INCOME'">
+                <option value="">---------</option>
+                {% for cat in form.category.field.queryset %}
+                    {% if cat.kind == "INCOME" %}
+                        <option value="{{ cat.pk }}" {% if form.category.value|stringformat:"s" == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            {{ form.category.errors }}
+        </p>
+
+        <p>
+            {{ form.note.label_tag }}
+            {{ form.note }}
+            {{ form.note.errors }}
+        </p>
+
+        <p>
+            {{ form.receipt_reference.label_tag }}
+            {{ form.receipt_reference }}
+            {{ form.receipt_reference.errors }}
+        </p>
+
+        <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Save</button>
+    </form>
+{% endblock content %}
