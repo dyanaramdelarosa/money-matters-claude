@@ -140,6 +140,43 @@ def test_edit_view_404s_for_another_users_account(client):
     assert account.name != "Hijacked"
 
 
+def test_opening_balance_view_updates_opening_balance_and_shifts_current_balance(client):
+    profile = ProfileFactory()
+    account = AccountFactory(
+        user=profile.user, currency=profile.base_currency, opening_balance=Decimal("100.00")
+    )
+    account.adjust_balance(Decimal("-30.00"))
+    account.refresh_from_db()
+    assert account.balance == Decimal("70.00")
+    client.force_login(profile.user)
+
+    response = client.post(
+        reverse("accounts:edit_opening_balance", args=[account.pk]),
+        {"opening_balance": "150.00"},
+    )
+
+    assert response.status_code == 302
+    account.refresh_from_db()
+    assert account.opening_balance == Decimal("150.00")
+    assert account.balance == Decimal("120.00")
+
+
+def test_opening_balance_view_404s_for_another_users_account(client):
+    profile = ProfileFactory()
+    other_profile = ProfileFactory()
+    account = AccountFactory(user=other_profile.user, currency=other_profile.base_currency)
+    client.force_login(profile.user)
+
+    response = client.post(
+        reverse("accounts:edit_opening_balance", args=[account.pk]),
+        {"opening_balance": "999.00"},
+    )
+
+    assert response.status_code == 404
+    account.refresh_from_db()
+    assert account.opening_balance != Decimal("999.00")
+
+
 def test_archive_view_archives_own_account(client):
     profile = ProfileFactory()
     account = AccountFactory(user=profile.user, currency=profile.base_currency)

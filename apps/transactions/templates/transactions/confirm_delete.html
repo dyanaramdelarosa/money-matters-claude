@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block head_title %}Delete transaction{% endblock %}
+
+{% block content %}
+    <h1 class="mb-6 text-2xl font-semibold text-slate-900">Delete this transaction?</h1>
+    <div class="max-w-md rounded-lg border border-slate-200 bg-white p-6">
+        <p class="mb-4 text-sm text-slate-700">
+            {{ transaction.get_type_display }} of {{ transaction.amount }} {{ transaction.currency }}
+            on {{ transaction.date|date:"m/d/Y" }} for {{ transaction.account.name }}{% if transaction.transfer_to_account %} &rarr; {{ transaction.transfer_to_account.name }}{% endif %}.
+            This will reverse its effect on the account balance and cannot be undone.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500">Delete</button>
+            <a href="{% url 'transactions:detail' transaction.pk %}" class="ml-4 text-sm text-slate-500 hover:underline">Cancel</a>
+        </form>
+    </div>
+{% endblock content %}

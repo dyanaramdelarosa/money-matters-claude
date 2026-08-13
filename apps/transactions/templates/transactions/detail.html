@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block head_title %}Transaction detail{% endblock %}
+
+{% block content %}
+    <h1 class="mb-6 text-2xl font-semibold text-slate-900">{{ transaction.get_type_display }}</h1>
+    <dl class="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Date</dt>
+            <dd class="text-sm text-slate-900">{{ transaction.date|date:"m/d/Y" }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Amount</dt>
+            <dd class="text-sm text-slate-900">{{ transaction.amount }} {{ transaction.currency }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-slate-500">Account</dt>
+            <dd class="text-sm text-slate-900">{{ transaction.account.name }}</dd>
+        </div>
+        {% if transaction.transfer_to_account %}
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Transfer to</dt>
+                <dd class="text-sm text-slate-900">{{ transaction.transfer_to_account.name }}</dd>
+            </div>
+        {% endif %}
+        {% if transaction.category %}
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Category</dt>
+                <dd class="text-sm text-slate-900">{{ transaction.category.name }}</dd>
+            </div>
+        {% endif %}
+        {% if transaction.note %}
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Note</dt>
+                <dd class="text-sm text-slate-900">{{ transaction.note }}</dd>
+            </div>
+        {% endif %}
+        {% if transaction.receipt_reference %}
+            <div>
+                <dt class="text-sm font-medium text-slate-500">Receipt reference</dt>
+                <dd class="text-sm text-slate-900">{{ transaction.receipt_reference }}</dd>
+            </div>
+        {% endif %}
+    </dl>
+    <div class="mt-4 text-sm">
+        <a href="{% url 'transactions:edit' transaction.pk %}" class="text-indigo-600 hover:underline">Edit</a>
+        <a href="{% url 'transactions:delete' transaction.pk %}" class="ml-4 text-red-600 hover:underline">Delete</a>
+        <a href="{% url 'transactions:list' %}" class="ml-4 text-slate-500 hover:underline">Back to transactions</a>
+    </div>
+{% endblock content %}

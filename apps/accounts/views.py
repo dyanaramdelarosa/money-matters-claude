@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from .forms import AccountCreateForm, AccountEditForm
+from .forms import AccountCreateForm, AccountEditForm, AccountOpeningBalanceForm
 from .models import Account
 
 
@@ -58,9 +58,30 @@ class AccountUpdateView(LoginRequiredMixin, UpdateView):
         kwargs["user"] = self.request.user
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault("opening_balance_form", AccountOpeningBalanceForm(instance=self.object))
+        return context
+
 
 class AccountArchiveView(LoginRequiredMixin, View):
     def post(self, request, pk):
         account = get_object_or_404(Account, pk=pk, user=request.user)
         account.archive()
         return redirect("accounts:list")
+
+
+class AccountEditOpeningBalanceView(LoginRequiredMixin, UpdateView):
+    model = Account
+    form_class = AccountOpeningBalanceForm
+    template_name = "accounts/opening_balance_form.html"
+
+    def get_queryset(self):
+        return Account.objects.filter(user=self.request.user)
+
+    def get_success_url(self):
+        return reverse_lazy("accounts:edit", kwargs={"pk": self.object.pk})
+
+    def form_valid(self, form):
+        self.object.set_opening_balance(form.cleaned_data["opening_balance"])
+        return redirect(self.get_success_url())

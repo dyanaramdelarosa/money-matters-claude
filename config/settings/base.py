@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.categories",
     "apps.accounts",
+    "apps.transactions",
 ]
 
 SITE_ID = 1

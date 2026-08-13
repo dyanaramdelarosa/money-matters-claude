@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block head_title %}Transactions{% endblock %}
+
+{% block content %}
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold text-slate-900">Transactions</h1>
+        <a href="{% url 'transactions:create' %}" class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">New Transaction</a>
+    </div>
+
+    <form method="get" class="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-6 sm:grid-cols-3 lg:grid-cols-6">
+        {{ filter_form.as_p }}
+        <div class="col-span-2 flex items-end gap-3 sm:col-span-1 lg:col-span-6">
+            <button type="submit" class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Filter</button>
+            <a href="{% url 'transactions:list' %}" class="text-sm text-slate-500 hover:underline">Clear filters</a>
+        </div>
+    </form>
+
+    {% if transactions %}
+        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <table class="w-full table-fixed divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="w-[10%] px-6 py-3 text-left font-medium text-slate-500">Date</th>
+                        <th class="w-[9%] px-6 py-3 text-left font-medium text-slate-500">Type</th>
+                        <th class="w-[18%] px-6 py-3 text-left font-medium text-slate-500">Account</th>
+                        <th class="w-[13%] px-6 py-3 text-left font-medium text-slate-500">Category</th>
+                        <th class="w-[20%] px-6 py-3 text-left font-medium text-slate-500">Note</th>
+                        <th class="w-[13%] px-6 py-3 text-left font-medium text-slate-500">Amount</th>
+                        <th class="w-[17%] px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for txn in transactions %}
+                        <tr>
+                            <td class="px-6 py-3">{{ txn.date|date:"m/d/Y" }}</td>
+                            <td class="px-6 py-3">{{ txn.get_type_display }}</td>
+                            <td class="px-6 py-3 truncate">
+                                <a href="{% url 'transactions:detail' txn.pk %}" class="text-indigo-600 hover:underline">
+                                    {% if txn.type == "TRANSFER" %}{{ txn.account.name }} &rarr; {{ txn.transfer_to_account.name }}{% else %}{{ txn.account.name }}{% endif %}
+                                </a>
+                            </td>
+                            <td class="px-6 py-3">{{ txn.category.name|default:"—" }}</td>
+                            <td class="px-6 py-3 truncate" title="{{ txn.note }}">{{ txn.note|truncatechars:40|default:"—" }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums {% if txn.type == 'EXPENSE' %}text-red-600{% elif txn.type == 'INCOME' %}text-emerald-600{% endif %}">{{ txn.amount }}</td>
+                            <td class="px-6 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'transactions:edit' txn.pk %}" class="text-slate-500 hover:text-slate-800">Edit</a>
+                                <a href="{% url 'transactions:delete' txn.pk %}" class="ml-2 text-slate-500 hover:text-red-600">Delete</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+            <div class="mt-4 flex items-center justify-between text-sm text-slate-600">
+                <div>
+                    {% if page_obj.has_previous %}
+                        <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}" class="text-indigo-600 hover:underline">Previous</a>
+                    {% endif %}
+                </div>
+                <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+                <div>
+                    {% if page_obj.has_next %}
+                        <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}" class="text-indigo-600 hover:underline">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <p class="text-sm text-slate-600">
+            {% if request.GET %}No transactions match these filters.{% else %}No transactions yet.{% endif %}
+        </p>
+    {% endif %}
+{% endblock content %}

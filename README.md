@@ -3,8 +3,10 @@
 A personal budgeting web application. See `specs.md` for the full product spec and
 `CLAUDE.md` for architecture, domain rules, and conventions.
 
-> This README covers Milestones 1-2 (scaffold, auth). Docker Compose, seed data, and
-> full deployment notes land in a later milestone.
+> This README covers Milestones 1-4 (scaffold, auth, accounts/categories CRUD,
+> transactions CRUD including transfers) plus the post-Milestone-4 additions listed
+> below. Docker Compose, seed data, and full deployment notes land in a later milestone
+> (see `specs.md` Milestones list).
 
 ## Quickstart
 
@@ -20,8 +22,18 @@ uv run python manage.py runserver
 
 Visit `http://127.0.0.1:8000/auth/signup/` to create a user (pick an email,
 password, and base currency — there's no `createsuperuser`-provisioned default
-account). You'll land on `/profile/` after signing up. Password-reset emails print to
-the terminal in dev (console email backend) instead of actually sending.
+account). You'll land on `/profile/` after signing up; a starter set of expense/income
+categories is seeded automatically. Password-reset emails print to the terminal in dev
+(console email backend) instead of actually sending.
+
+From there:
+- `/accounts/` — manage Accounts (cash/bank/credit card/etc, one currency per user).
+  Editing an account also exposes "Correct Current Balance" (logs a Balance Correction
+  transaction) and "Edit Opening Balance" (shifts the balance directly, no transaction)
+  as extra sections on the same page.
+- `/categories/` — manage expense/income categories.
+- `/transactions/` — the ledger: create expenses, income, transfers between your own
+  accounts, and filter the list by date range, type, account, or category.
 
 Visit `http://127.0.0.1:8000/healthz/` — should return `{"status": "ok"}`.
 
@@ -48,6 +60,9 @@ uv run pytest                    # run tests
 uv run ruff check .              # lint
 uv run ruff format .             # format
 uv run python manage.py tailwind build   # compile Tailwind CSS after template/class changes
+uv run python manage.py reconcile_balances       # report any drift between accounts'
+                                                  # cached balance and their transaction history
+uv run python manage.py reconcile_balances --fix # ...and correct it
 pre-commit install               # install git hooks once per clone
 pre-commit run --all-files       # run all hooks manually
 ```

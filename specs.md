@@ -212,4 +212,67 @@ reference; full rationale for each lives in `CLAUDE.md`.
   error, surfaced via an Alpine.js modal (`templates/partials/form_errors_modal.html`)
   rather than a crash or a silent inline-only error.
 
+### Milestone 4 (Transactions CRUD including transfers)
+- Receipt/attachment field: a text/URL reference (`CharField`), not a real file upload —
+  this is the resolution of the Transactions section's "optional attachment/receipt
+  reference" field. No storage backend or `MEDIA_ROOT`/`MEDIA_URL` needed yet; upgrading
+  to real uploads later is additive, not a rework.
+- Overdraft: allowed everywhere, no balance floor enforced by the app — matches how a
+  `CREDIT_CARD` account naturally works; the spec doesn't ask for one.
+- Transfer schema: one `Transaction` row per transfer (`account` = source,
+  `transfer_to_account` = destination, nullable/TRANSFER-only), not two linked rows —
+  this is the resolution of the Transactions section's "A TRANSFER references a source
+  and a destination account, moves the amount in one atomic operation" requirement.
+- Balance-effect logic (the reverse-and-reapply edit path the spec calls out as "the
+  single most common bug in this kind of app") lives in `apps/transactions/services.py`,
+  not in `Transaction.save()` — so a plain `.save()` (admin, shell, fixtures) can never
+  silently skip balance adjustment. Every individual delta reuses `Account.adjust_balance()`
+  (built in Milestone 3), applied in a consistent `account.pk` order to avoid
+  lock-ordering deadlocks on a transfer's two accounts.
+- `reconcile_balances` — deferred from Milestone 3 since there was nothing to reconcile
+  against yet — lands in `apps.transactions` (not `apps.accounts`), since recomputing
+  needs the full ledger; `transactions` already depends on `accounts` via FK, so this
+  doesn't introduce a new dependency direction. Reports drift via DB aggregation, `--fix`
+  to correct.
+- Transaction deletion: hard delete, not archive/soft-delete — unlike Account/Category,
+  nothing references a Transaction by FK, so nothing can be orphaned, and the spec lists
+  delete as a normal write needing correct balance reversal. A confirm page guards the
+  irreversible action.
+- Category is required and kind-matched (`category.kind == type`) for EXPENSE/INCOME,
+  forbidden for TRANSFER — this is exactly what Milestone 3 split `Category.kind` early
+  for. Enforced in `Transaction.clean()`.
+- Transaction admin is read-only this milestone — a writable default admin would let a
+  mutation bypass the service layer and silently desync the balance cache; a
+  mutation-safe, audit-logged admin path is Milestone 7's job.
+- UI stays plain CRUD like Milestone 3, but the create/edit form uses Alpine.js
+  (type-conditional fields: hide the destination-account field unless TRANSFER, swap
+  between EXPENSE-kind and INCOME-kind category dropdowns) — HTMX stays deferred to
+  wherever the payoff is clearest, still expected to be the Milestone 6 dashboard.
+- Post-milestone addition: two account-balance corrections the milestone didn't cover —
+  correcting the *current* balance (e.g. unlogged spending) and correcting the *opening*
+  balance. These needed different handling: a current-balance correction is a real event,
+  so it's a new `TransactionType.ADJUSTMENT` (single-account, signed `amount`, no
+  category) that flows through the existing `services.create_transaction`/
+  `delete_transaction` pipeline — this is what keeps `reconcile_balances` from silently
+  reverting it as drift. An opening-balance correction is not an event, just a fix to the
+  ledger's baseline, so `Account.set_opening_balance()` shifts `balance` by the same delta
+  directly and deliberately creates no Transaction, to avoid double-counting against
+  `reconcile_balances`. `amount`'s `MinValueValidator` moved off the field and into
+  `Transaction.clean()` (branching on type) to allow `ADJUSTMENT`'s signed value.
+  `ADJUSTMENT` is excluded from the general transaction form's type choices and can't be
+  edited once created (only deleted, which correctly reverses it) — it's only produced via
+  the dedicated "Correct balance" flow, which lives as an additional section on the
+  account edit page (not the detail page — moved there so every account-level mutation is
+  in one place).
+- Post-milestone addition: simple filters on the Transactions list page (date range,
+  type, account, category), reconsidering the milestone's original "no filter UI, that's
+  Analytics' (Milestone 6) job" call. Scoped narrowly to the ledger's own structured
+  fields via `TransactionFilterForm`, applied to `TransactionListView.get_queryset()` off
+  `request.GET` — not the arbitrary-date-range-with-presets/charting/aggregation work
+  Milestone 6 still owns. Filter dropdowns use `.active()`, same as the create/edit form
+  (revised post-launch — archived rows were initially left in on purpose so historical
+  transactions stayed filterable, but that made archived items read as clutter; filtering
+  by an archived row's id directly now fails validation like a cross-user id does), and
+  the account filter matches either leg of a transfer.
+
 Start with the plan.

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block head_title %}Correct Balance — {{ account.name }}{% endblock %}
+
+{% block content %}
+    {% include "partials/form_errors_modal.html" %}
+    <h1 class="mb-2 text-2xl font-semibold text-slate-900">Correct Balance</h1>
+    <p class="mb-6 text-sm text-slate-500">
+        {{ account.name }} — current balance {{ account.balance }} {{ account.currency }}.
+        This records a Balance Correction transaction so the change stays part of the account's history.
+    </p>
+    <form method="post" class="max-w-md rounded-lg border border-slate-200 bg-white p-6">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Save</button>
+    </form>
+{% endblock content %}
