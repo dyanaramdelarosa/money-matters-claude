@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -15,6 +17,14 @@ class AccountListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return Account.objects.filter(user=self.request.user).active()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_currency"] = self.request.user.profile.base_currency
+        context["total_balance"] = sum(
+            (account.balance for account in context["accounts"]), Decimal("0.00")
+        )
+        return context
 
 
 class AccountDetailView(LoginRequiredMixin, DetailView):

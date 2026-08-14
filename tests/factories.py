@@ -5,6 +5,7 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.accounts.models import Account, AccountType
+from apps.budgets.models import BudgetDefinition, BudgetScope
 from apps.categories.models import Category, CategoryKind
 from apps.transactions.models import Transaction, TransactionType
 from apps.users.models import Profile
@@ -58,3 +59,13 @@ class TransactionFactory(DjangoModelFactory):
     date = factory.LazyFunction(timezone.localdate)
     account = factory.SubFactory(AccountFactory, user=factory.SelfAttribute("..user"))
     category = factory.SubFactory(CategoryFactory, user=factory.SelfAttribute("..user"))
+
+
+class BudgetDefinitionFactory(DjangoModelFactory):
+    class Meta:
+        model = BudgetDefinition
+
+    user = factory.SubFactory(UserFactory)
+    category = factory.SubFactory(CategoryFactory, user=factory.SelfAttribute("..user"))
+    scope = BudgetScope.MONTHLY
+    amount = Decimal("500.00")

@@ -30,6 +30,27 @@ def test_list_view_only_shows_own_active_accounts(client):
     assert list(response.context["accounts"]) == [mine]
 
 
+def test_list_view_total_balance_sums_own_active_accounts(client):
+    profile = ProfileFactory()
+    other_profile = ProfileFactory()
+    AccountFactory(
+        user=profile.user, currency=profile.base_currency, opening_balance=Decimal("100.00")
+    )
+    AccountFactory(
+        user=profile.user, currency=profile.base_currency, opening_balance=Decimal("250.50")
+    )
+    AccountFactory(user=other_profile.user, currency=other_profile.base_currency)
+    archived = AccountFactory(
+        user=profile.user, currency=profile.base_currency, opening_balance=Decimal("999.00")
+    )
+    archived.archive()
+
+    client.force_login(profile.user)
+    response = client.get(reverse("accounts:list"))
+
+    assert response.context["total_balance"] == Decimal("350.50")
+
+
 def test_create_account_sets_user_and_currency_from_profile(client):
     profile = ProfileFactory(base_currency="PHP")
     client.force_login(profile.user)
