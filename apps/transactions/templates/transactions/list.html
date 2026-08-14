@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load money %}
 
 {% block head_title %}Transactions{% endblock %}
 
@@ -26,7 +27,7 @@
                         <th class="w-[18%] px-6 py-3 text-left font-medium text-slate-500">Account</th>
                         <th class="w-[13%] px-6 py-3 text-left font-medium text-slate-500">Category</th>
                         <th class="w-[20%] px-6 py-3 text-left font-medium text-slate-500">Note</th>
-                        <th class="w-[13%] px-6 py-3 text-left font-medium text-slate-500">Amount</th>
+                        <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Amount</th>
                         <th class="w-[17%] px-6 py-3"></th>
                     </tr>
                 </thead>
@@ -42,7 +43,7 @@
                             </td>
                             <td class="px-6 py-3">{{ txn.category.name|default:"—" }}</td>
                             <td class="px-6 py-3 truncate" title="{{ txn.note }}">{{ txn.note|truncatechars:40|default:"—" }}</td>
-                            <td class="px-6 py-3 text-right tabular-nums {% if txn.type == 'EXPENSE' %}text-red-600{% elif txn.type == 'INCOME' %}text-emerald-600{% endif %}">{{ txn.amount }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums {% if txn.type == 'EXPENSE' %}text-red-600{% elif txn.type == 'INCOME' %}text-emerald-600{% endif %}">{{ txn.amount|money:txn.currency }}</td>
                             <td class="px-6 py-3 text-right whitespace-nowrap">
                                 <a href="{% url 'transactions:edit' txn.pk %}" class="text-slate-500 hover:text-slate-800">Edit</a>
                                 <a href="{% url 'transactions:delete' txn.pk %}" class="ml-2 text-slate-500 hover:text-red-600">Delete</a>

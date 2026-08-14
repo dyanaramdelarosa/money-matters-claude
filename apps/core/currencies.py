@@ -34,3 +34,36 @@ CURRENCY_CHOICES = [
 ]
 
 DEFAULT_CURRENCY = "USD"
+
+# Display symbols for the codes above — prefixed onto the amount regardless of a
+# currency's native placement/spacing convention (e.g. "kr 500.00", not "500.00 kr"),
+# for one consistent rendering rule across the app rather than a per-currency table.
+CURRENCY_SYMBOLS = {
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "JPY": "¥",
+    "AUD": "$",
+    "CAD": "$",
+    "CHF": "Fr",
+    "CNY": "¥",
+    "HKD": "$",
+    "SGD": "$",
+    "NZD": "$",
+    "INR": "₹",
+    "PHP": "₱",
+    "IDR": "Rp",
+    "MYR": "RM",
+    "THB": "฿",
+    "VND": "₫",
+    "KRW": "₩",
+    "AED": "د.إ",
+    "SAR": "﷼",
+    "ZAR": "R",
+    "BRL": "R$",
+    "MXN": "$",
+    "SEK": "kr",
+    "NOK": "kr",
+    "DKK": "kr",
+    "PLN": "zł",
+}

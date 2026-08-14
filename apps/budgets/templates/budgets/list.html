@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load money %}
+
+{% block head_title %}Budgets{% endblock %}
+
+{% block content %}
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold text-slate-900">Budgets</h1>
+        <a href="{% url 'budgets:create' %}" class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">New Budget</a>
+    </div>
+
+    {% if rows %}
+        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <table class="w-full table-fixed divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="w-[20%] px-6 py-3 text-left font-medium text-slate-500">Category</th>
+                        <th class="w-[15%] px-6 py-3 text-left font-medium text-slate-500">Scope</th>
+                        <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Budgeted</th>
+                        <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Spent</th>
+                        <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Remaining</th>
+                        <th class="w-[11%] px-6 py-3 text-right font-medium text-slate-500">% Used</th>
+                        <th class="w-[15%] px-6 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for row in rows %}
+                        <tr>
+                            <td class="px-6 py-3 truncate">{{ row.definition.category.name|default:"Overall" }}</td>
+                            <td class="px-6 py-3">{{ row.definition.get_scope_display }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums">{{ row.period.amount|money:base_currency }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums">{{ row.spent|money:base_currency }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums {% if row.remaining < 0 %}text-red-600{% endif %}">{{ row.remaining|money:base_currency }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums">
+                                {% if row.percent_used is not None %}{{ row.percent_used|floatformat:0 }}%{% else %}—{% endif %}
+                            </td>
+                            <td class="px-6 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'budgets:edit' row.definition.pk %}" class="text-slate-500 hover:text-slate-800">Edit</a>
+                                <form method="post" action="{% url 'budgets:archive' row.definition.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="ml-2 text-slate-500 hover:text-red-600">Archive</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="border-t border-slate-200 bg-slate-50">
+                    <tr>
+                        <td class="px-6 py-3 font-medium text-slate-700" colspan="2">Total</td>
+                        <td class="px-6 py-3 text-right font-medium tabular-nums text-slate-700">{{ totals.budgeted|money:base_currency }}</td>
+                        <td class="px-6 py-3 text-right font-medium tabular-nums text-slate-700">{{ totals.spent|money:base_currency }}</td>
+                        <td class="px-6 py-3 text-right font-medium tabular-nums {% if totals.remaining < 0 %}text-red-600{% else %}text-slate-700{% endif %}">{{ totals.remaining|money:base_currency }}</td>
+                        <td class="px-6 py-3 text-right font-medium tabular-nums text-slate-700">
+                            {% if totals.percent_used is not None %}{{ totals.percent_used|floatformat:0 }}%{% else %}—{% endif %}
+                        </td>
+                        <td class="px-6 py-3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-sm text-slate-600">No budgets yet.</p>
+    {% endif %}
+{% endblock content %}

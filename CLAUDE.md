@@ -20,7 +20,7 @@
    layout, conventions) and `README.md` — update them as changes land, not
    retroactively.
 
-## Architecture (as of Milestone 4)
+## Architecture (as of Milestone 5)
 
 - **Frontend**: server-rendered Django templates + HTMX + Alpine.js + Tailwind.
   DRF/SPA was rejected: this is a CRUD app and a separate API layer doubles
@@ -234,12 +234,51 @@
   behavior (row locking, etc.) — be aware of that gap when testing anything
   concurrency-sensitive (balance updates, transfers) and prefer running
   against Postgres for those.
+- **Budgets** (Milestone 5): the spec's hard requirement — editing a budget
+  must never retroactively change an already-closed period's report — is met
+  by splitting the recurring rule from what was actually in force each
+  period. `BudgetDefinition` (`user`, `category` — nullable, null meaning
+  "Overall" across every expense category — `scope`
+  (`SEMI_MONTHLY`/`MONTHLY`/`ANNUAL`), `amount`, archive pattern) is the rule
+  a user sets up; `BudgetPeriod` (`definition`, `period_start`, `period_end`,
+  a snapshotted `amount`) is materialized lazily — the first time a period is
+  actually needed, not on any schedule — since the project has no task
+  scheduler (no Celery, no django-crontab) and nothing else here runs
+  background jobs. If a definition is never edited, the next period's
+  materialization just snapshots the same amount again, which is what gives
+  "no changes → same budget carries forward" for free. `category` is nullable
+  for "Overall", which means a plain `UniqueConstraint(["user", "category",
+  "scope"])` would silently miss duplicate Overall budgets — SQL treats
+  `NULL != NULL`, so `BudgetDefinition.Meta.constraints` is split into two
+  conditional constraints, one scoped `category__isnull=False` and one scoped
+  `category__isnull=True`. `apps.budgets.services.update_definition_amount()`
+  (not `BudgetDefinition.save()`, same "mutation of a cache-like derived
+  record belongs in services.py" rule Milestone 4 established for
+  `Account.balance`) is what implements "editing affects the current period
+  immediately but never a closed one": it saves the new amount, then
+  `BudgetPeriod.objects.filter(definition=definition,
+  period_end__gte=today).update(amount=new_amount)` — a closed period's
+  `period_end` is always in the past, so that single filter is the entire
+  immutability guarantee. Only `amount` is editable post-creation
+  (`category`/`scope` are not) — same restriction as `AccountEditForm`
+  excluding `opening_balance`; changing what a budget covers is a
+  create-a-new-one action. `spent_for_period()` aggregates
+  `Transaction` amounts in the DB (`Sum`, not a Python loop, per the spec's
+  Analytics aggregation rule), scoped to `EXPENSE` transactions within the
+  period and, for a category budget, that category. The Milestone 5 UI is
+  CRUD plus this spent/remaining/percent-used figure per budget on the list
+  page — the arbitrary-date-range/preset/charting work under "budgeted vs.
+  spent vs. remaining vs. percent used" is still Milestone 6's job; this is
+  just reusing the same aggregate query a level early because it was cheap
+  and the user wanted it now. Both models' admin is fully read-only, same
+  rationale as `TransactionAdmin` — a writable admin could edit `amount`
+  directly and bypass the period-sync above.
 - **Domain apps** (one per bounded context; created as their milestone lands,
   not all up front): `core` (shared abstract models/utils — exists),
   `users` (Profile — exists), `accounts` (exists), `categories` (exists;
   shared by transactions and budgets — kept separate to avoid a dependency
-  cycle between the two), `transactions` (exists), `budgets`, `analytics`
-  (aggregation only, no models), `audit` (append-only log).
+  cycle between the two), `transactions` (exists), `budgets` (exists),
+  `analytics` (aggregation only, no models), `audit` (append-only log).
 
 ## Tailwind
 
@@ -317,6 +356,17 @@ apps/                   # domain apps live here, one per bounded context
                               #   AccountBalanceCorrectionView, all user-scoped
     management/commands/
       reconcile_balances.py  # --fix; per-account DB-aggregate drift report
+  budgets/
+    models.py                # BudgetScope; BudgetDefinition (category nullable = Overall,
+                              #   two conditional unique constraints, archive()); BudgetPeriod
+                              #   (materialized snapshot, definition+period_start unique)
+    services.py               # period_bounds/get_or_create_period (lazy materialization) +
+                               #   update_definition_amount (current-period sync, the
+                               #   immutability guarantee) + spent_for_period (DB aggregate)
+    forms.py                  # BudgetDefinitionForm (create; explicit active-conflict
+                               #   clean()) vs BudgetAmountEditForm (amount only)
+    views.py                  # List(+spent/remaining/percent)/Create/Update/Archive,
+                               #   all user-scoped
 templates/               # project-level templates, shared across apps
   base.html               # site skeleton: tailwind_css tag, Alpine CDN, nav
   partials/
@@ -328,8 +378,8 @@ theme/
   source.css              # Tailwind input (committed); compiles to assets/css/tailwind.css
 tests/                  # all tests live here, mirroring apps/ — not inside each app
   factories.py            # factory-boy: UserFactory, ProfileFactory, AccountFactory,
-                           #   CategoryFactory, TransactionFactory — shared across app
-                           #   test subpackages
+                           #   CategoryFactory, TransactionFactory, BudgetDefinitionFactory —
+                           #   shared across app test subpackages
   core/
     test_healthz.py
   users/
@@ -340,6 +390,8 @@ tests/                  # all tests live here, mirroring apps/ — not inside ea
     test_models.py, test_signals.py, test_views.py
   transactions/
     test_models.py, test_services.py, test_reconcile_balances.py, test_views.py
+  budgets/
+    test_models.py, test_services.py, test_views.py
 manage.py
 ```
 
