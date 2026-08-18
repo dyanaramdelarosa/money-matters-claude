@@ -101,3 +101,28 @@ def test_archive_sets_is_archived_and_archived_at():
 
     assert definition.is_archived is True
     assert definition.archived_at is not None
+
+
+def test_clean_rejects_second_half_amount_on_a_non_semi_monthly_budget():
+    profile = ProfileFactory()
+    definition = BudgetDefinition(
+        user=profile.user,
+        scope=BudgetScope.MONTHLY,
+        amount=Decimal("500"),
+        second_half_amount=Decimal("300"),
+    )
+
+    with pytest.raises(ValidationError):
+        definition.clean()
+
+
+def test_clean_allows_second_half_amount_on_a_semi_monthly_budget():
+    profile = ProfileFactory()
+    definition = BudgetDefinition(
+        user=profile.user,
+        scope=BudgetScope.SEMI_MONTHLY,
+        amount=Decimal("20000"),
+        second_half_amount=Decimal("10000"),
+    )
+
+    definition.clean()

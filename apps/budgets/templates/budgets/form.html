@@ -7,9 +7,48 @@
     <h1 class="mb-6 text-2xl font-semibold text-slate-900">
         {% if form.instance.pk %}Edit Budget{% else %}New Budget{% endif %}
     </h1>
-    <form method="post" class="max-w-md rounded-lg border border-slate-200 bg-white p-6">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Save</button>
-    </form>
+    {% if form.scope %}
+        <form
+            method="post"
+            x-data="{ scope: '{{ form.scope.value|default:'MONTHLY' }}' }"
+            class="max-w-md rounded-lg border border-slate-200 bg-white p-6"
+        >
+            {% csrf_token %}
+            <p>
+                {{ form.category.label_tag }}
+                {{ form.category }}
+                {{ form.category.errors }}
+            </p>
+            <p>
+                {{ form.scope.label_tag }}
+                <select name="scope" id="id_scope" x-model="scope">
+                    {% for value, label in form.scope.field.choices %}
+                        <option value="{{ value }}" {% if form.scope.value == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {{ form.scope.errors }}
+            </p>
+            <p>
+                {{ form.amount.label_tag }}
+                {{ form.amount }}
+                {{ form.amount.errors }}
+            </p>
+            <p x-show="scope === 'SEMI_MONTHLY'" x-cloak>
+                {{ form.second_half_amount.label_tag }}
+                {{ form.second_half_amount }}
+                {{ form.second_half_amount.errors }}
+                <span class="mt-1 block text-xs text-slate-500">Leave blank to use the same amount for both halves of the month.</span>
+            </p>
+            <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Save</button>
+        </form>
+    {% else %}
+        <form method="post" class="max-w-md rounded-lg border border-slate-200 bg-white p-6">
+            {% csrf_token %}
+            {{ form.as_p }}
+            {% if form.second_half_amount %}
+                <p class="mt-1 text-xs text-slate-500">Leave blank to use the same amount for both halves of the month.</p>
+            {% endif %}
+            <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Save</button>
+        </form>
+    {% endif %}
 {% endblock content %}

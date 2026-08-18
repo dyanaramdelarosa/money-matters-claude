@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{% block head_title %}MoneyMatters{% endblock %}</title>
         {% tailwind_css %}
+        <script defer src="https://unpkg.com/htmx.org@2.x.x/dist/htmx.min.js"></script>
         <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
         {% block extra_head %}
         {% endblock extra_head %}
@@ -16,6 +17,7 @@
                     <a href="{% url 'users:profile' %}" class="text-lg font-semibold text-slate-900">MoneyMatters</a>
                     <ul class="flex items-center gap-4 text-sm">
                         {% if user.is_authenticated %}
+                            <li><a href="{% url 'analytics:dashboard' %}" class="text-slate-600 hover:text-slate-900">Dashboard</a></li>
                             <li><a href="{% url 'accounts:list' %}" class="text-slate-600 hover:text-slate-900">Accounts</a></li>
                             <li><a href="{% url 'categories:list' %}" class="text-slate-600 hover:text-slate-900">Categories</a></li>
                             <li><a href="{% url 'transactions:list' %}" class="text-slate-600 hover:text-slate-900">Transactions</a></li>

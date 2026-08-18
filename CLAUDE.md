@@ -20,20 +20,19 @@
    layout, conventions) and `README.md` — update them as changes land, not
    retroactively.
 
-## Architecture (as of Milestone 5)
+## Architecture (as of Milestone 6)
 
 - **Frontend**: server-rendered Django templates + HTMX + Alpine.js + Tailwind.
   DRF/SPA was rejected: this is a CRUD app and a separate API layer doubles
   the surface area for no benefit. Tailwind is compiled via `django-tailwind-cli`
-  (standalone binary, no Node/npm) — see "Tailwind" below. HTMX still isn't
-  functionally wired in (no middleware, no partial-update views) — Accounts/
-  Categories CRUD (Milestone 3) stayed plain full-page Django views, and
-  Milestone 4 (Transactions) reached for Alpine.js instead of HTMX too (see
-  the Transactions bullet below) — its dynamic form fields are pure
-  client-side show/hide, no server round-trip needed. First real HTMX usage
-  is now expected at the Milestone 6 dashboard, wherever a partial re-render
-  (date-range filters, chart updates) actually pays for the added moving
-  parts.
+  (standalone binary, no Node/npm) — see "Tailwind" below. Accounts/Categories
+  CRUD (Milestone 3) stayed plain full-page Django views, and Milestone 4
+  (Transactions) reached for Alpine.js instead of HTMX (see the Transactions
+  bullet below) — its dynamic form fields are pure client-side show/hide, no
+  server round-trip needed. **HTMX is now loaded globally in `base.html`**
+  (`<script defer src=".../htmx.min.js">`, same CDN-script pattern as
+  Alpine), first put to real use by the Milestone 6 dashboard — see the
+  Analytics bullet below.
 - **Auth**: `django-allauth`, email/password only, no username field
   (`ACCOUNT_LOGIN_METHODS = {"email"}`). No email verification required
   (`ACCOUNT_EMAIL_VERIFICATION = "none"`) — there's no transactional email
@@ -237,48 +236,99 @@
 - **Budgets** (Milestone 5): the spec's hard requirement — editing a budget
   must never retroactively change an already-closed period's report — is met
   by splitting the recurring rule from what was actually in force each
-  period. `BudgetDefinition` (`user`, `category` — nullable, null meaning
-  "Overall" across every expense category — `scope`
-  (`SEMI_MONTHLY`/`MONTHLY`/`ANNUAL`), `amount`, archive pattern) is the rule
-  a user sets up; `BudgetPeriod` (`definition`, `period_start`, `period_end`,
-  a snapshotted `amount`) is materialized lazily — the first time a period is
-  actually needed, not on any schedule — since the project has no task
-  scheduler (no Celery, no django-crontab) and nothing else here runs
-  background jobs. If a definition is never edited, the next period's
-  materialization just snapshots the same amount again, which is what gives
-  "no changes → same budget carries forward" for free. `category` is nullable
-  for "Overall", which means a plain `UniqueConstraint(["user", "category",
-  "scope"])` would silently miss duplicate Overall budgets — SQL treats
-  `NULL != NULL`, so `BudgetDefinition.Meta.constraints` is split into two
-  conditional constraints, one scoped `category__isnull=False` and one scoped
-  `category__isnull=True`. `apps.budgets.services.update_definition_amount()`
-  (not `BudgetDefinition.save()`, same "mutation of a cache-like derived
-  record belongs in services.py" rule Milestone 4 established for
-  `Account.balance`) is what implements "editing affects the current period
-  immediately but never a closed one": it saves the new amount, then
-  `BudgetPeriod.objects.filter(definition=definition,
-  period_end__gte=today).update(amount=new_amount)` — a closed period's
-  `period_end` is always in the past, so that single filter is the entire
-  immutability guarantee. Only `amount` is editable post-creation
-  (`category`/`scope` are not) — same restriction as `AccountEditForm`
-  excluding `opening_balance`; changing what a budget covers is a
-  create-a-new-one action. `spent_for_period()` aggregates
-  `Transaction` amounts in the DB (`Sum`, not a Python loop, per the spec's
-  Analytics aggregation rule), scoped to `EXPENSE` transactions within the
-  period and, for a category budget, that category. The Milestone 5 UI is
-  CRUD plus this spent/remaining/percent-used figure per budget on the list
-  page — the arbitrary-date-range/preset/charting work under "budgeted vs.
-  spent vs. remaining vs. percent used" is still Milestone 6's job; this is
-  just reusing the same aggregate query a level early because it was cheap
-  and the user wanted it now. Both models' admin is fully read-only, same
-  rationale as `TransactionAdmin` — a writable admin could edit `amount`
-  directly and bypass the period-sync above.
+  period. `BudgetDefinition` (`user`, `category` nullable = "Overall", `scope`
+  `SEMI_MONTHLY`/`MONTHLY`/`ANNUAL`, `amount`, optional `second_half_amount`
+  for a Semi-monthly budget whose two halves differ, archive pattern) is the
+  rule; `BudgetPeriod` (`definition`, `period_start`, `period_end`, a
+  snapshotted `amount`) is materialized lazily — the first time a period is
+  actually needed, since the project has no task scheduler. `category`
+  nullable for "Overall" needs two conditional `UniqueConstraint`s
+  (`category__isnull=False`/`True`) instead of one plain constraint, since
+  SQL's `NULL != NULL` would otherwise let duplicate Overall budgets slip
+  through. `apps.budgets.services.update_definition_amount()` (not
+  `BudgetDefinition.save()` — same "derived-cache mutation belongs in
+  services.py" rule as `Account.balance`) is the immutability guarantee: it
+  saves the new amount(s), then syncs only periods with `period_end__gte=today`
+  — scoped per half (`period_start__day=1` vs `=16`) for Semi-monthly, so
+  editing one half can never clobber the other's already-materialized period
+  (which is why the two amounts are always submitted together in one form
+  rather than as separate edit actions). Only `amount`/`second_half_amount`
+  are editable post-creation (`category`/`scope` are not — same restriction
+  as `AccountEditForm` excluding `opening_balance`). `second_half_amount`
+  defaults to `None` (same as the first half) and is rejected by `clean()`
+  for any non-Semi-monthly scope; shown/hidden with Alpine on the create form
+  (`scope` is live-selectable there) but just deleted from `self.fields`
+  server-side on the edit form (`scope` is immutable post-creation, so no
+  reactivity needed). The budgets list shows a split's two figures as
+  stacked lines under the current period's amount. `spent_for_period()`
+  aggregates `Transaction` amounts in the DB, scoped to `EXPENSE` within the
+  period and, for a category budget, that category. Both models' admin is
+  fully read-only, same rationale as `TransactionAdmin` — a writable admin
+  could edit `amount` directly and bypass the period-sync above.
+- **Analytics / Dashboard** (Milestone 6): `apps.analytics` is aggregation
+  and views only, no models — reads `apps.transactions`, `apps.accounts`,
+  `apps.budgets`; nothing depends back on it. All six of the spec's minimum
+  charts live at `/dashboard/`: expense by category over time, income vs
+  expense trend, net cash flow, top spending categories, per-account balance
+  history, and budget vs actual.
+  **Charting**: Chart.js via CDN, loaded only from `dashboard.html`'s
+  `extra_head` block (not globally — no other page needs it). Each card view
+  builds a plain Chart.js-shaped config dict, converting `Decimal` to `float`
+  for the `json_script` payload — a deliberate precision loss for the visual
+  only; any money figure shown as text alongside a chart still uses the
+  `money` filter on the original `Decimal`.
+  **Bucketing** (`bucket_size_for_range()`): daily up to ~60 days, weekly up
+  to ~180, monthly beyond, so a chart stays readable at any range width;
+  `bucket_boundaries()` enumerates every bucket key up front so an empty
+  bucket renders as a real zero instead of a `GROUP BY` gap. `Transaction.date`
+  is a plain `DateField`, so the "day" bucket uses `F("date")` directly
+  rather than `TruncDate` (which assumes datetime input and raises).
+  **`account_balance_history()`**: pre-range balance and per-bucket deltas
+  via DB aggregates (reusing `signed_amount_expression()`, extracted from
+  `reconcile_balances._expected_balance()` so both share one definition of a
+  transaction's signed balance effect), then a Python walk over the small
+  (≤ ~53) bucket list — not the ledger itself, so it doesn't violate the
+  spec's "aggregate in the DB" rule.
+  **`budget_vs_actual(user, date_from=None, date_to=None)`**: reports each
+  budget's period as of the selected "To" date rather than always today, so
+  a Semi-monthly budget's card correctly flips halves as the filter changes.
+  When the selected range spans more than one period for that budget's scope
+  (the dashboard's own default month-to-date view once past the 15th; any
+  Year-range against a Monthly budget), every period the range touches is
+  materialized and summed (`_figures_for_range()`/`_next_period_start()`,
+  one algorithm shared by all three scopes) and the row's `scope_label` gets
+  `" (combined)"` appended so it reads as an aggregate, not one period's real
+  figure. Each row also carries its `period_start`/`period_end`/`scope_label`
+  so the card can always show which period(s) a figure covers.
+  **HTMX, per-card**: each of the six cards is its own independent HTMX
+  fragment (`hx-get`, `hx-trigger="load, analytics:filter-changed from:document"`,
+  `hx-include="#analytics-filters"`); the filter form's presets are plain JS
+  dispatching a `document`-level `analytics:filter-changed` event — no
+  Alpine needed, just "recompute two dates and fire an event." Default range
+  on first load: current month-to-date (`resolve_range()`); an invalid or
+  half-missing range falls back to that default per-card rather than
+  blocking all six cards with a form error.
+  **Two gotchas from manual browser verification** (curl can't execute JS,
+  so both needed a real headless-browser check): (1) the inline `<script>`
+  lives in `extra_head`, parsed before `<body>` exists, so a listener
+  registered on `document.body` silently never attached — every
+  listener/dispatch/trigger uses `document` instead, which exists from the
+  start of parsing. A shared `initAnalyticsCharts()` helper destroys any
+  prior `Chart` bound to a swapped-in `<canvas>` before constructing the new
+  one (Chart.js throws otherwise). (2) when a filter change fires all six
+  cards' HTMX swaps together, Chart.js can lock a canvas into its 300×150
+  fallback size while a later async resize pass inside Chart.js overwrites a
+  same-frame corrective `resize()` — visually reading as the chart being
+  "zoomed in" (full-size content clipped by an undersized canvas). Fixed by
+  delaying the corrective `resize()` by 50ms (`setTimeout`, not
+  `requestAnimationFrame`) so it has the final word.
 - **Domain apps** (one per bounded context; created as their milestone lands,
   not all up front): `core` (shared abstract models/utils — exists),
   `users` (Profile — exists), `accounts` (exists), `categories` (exists;
   shared by transactions and budgets — kept separate to avoid a dependency
   cycle between the two), `transactions` (exists), `budgets` (exists),
-  `analytics` (aggregation only, no models), `audit` (append-only log).
+  `analytics` (exists; aggregation only, no models), `audit` (append-only
+  log).
 
 ## Tailwind
 
@@ -358,17 +408,29 @@ apps/                   # domain apps live here, one per bounded context
       reconcile_balances.py  # --fix; per-account DB-aggregate drift report
   budgets/
     models.py                # BudgetScope; BudgetDefinition (category nullable = Overall,
+                              #   second_half_amount nullable, Semi-monthly only,
                               #   two conditional unique constraints, archive()); BudgetPeriod
                               #   (materialized snapshot, definition+period_start unique)
-    services.py               # period_bounds/get_or_create_period (lazy materialization) +
-                               #   update_definition_amount (current-period sync, the
-                               #   immutability guarantee) + spent_for_period (DB aggregate)
+    services.py               # period_bounds/get_or_create_period (lazy materialization,
+                               #   second_half_amount-aware) + update_definition_amount
+                               #   (current-period sync per half, the immutability
+                               #   guarantee) + spent_for_period (DB aggregate)
     forms.py                  # BudgetDefinitionForm (create; explicit active-conflict
-                               #   clean()) vs BudgetAmountEditForm (amount only)
+                               #   clean()) vs BudgetAmountEditForm (amount +
+                               #   second_half_amount, dropped for non-Semi-monthly)
     views.py                  # List(+spent/remaining/percent)/Create/Update/Archive,
                                #   all user-scoped
+  analytics/
+    services.py               # resolve_range/bucket_size_for_range/bucket_boundaries +
+                               #   the six chart-data functions, all DB-aggregate-based
+    forms.py                  # AnalyticsFilterForm (optional date_from/date_to)
+    views.py                  # DashboardView (shell) + six independent card views,
+                               #   all user-scoped, no models (aggregation only)
+    templates/analytics/
+      dashboard.html           # filter form, Chart.js CDN tag, six hx-get card containers
+      cards/_*.html             # one partial per card: <canvas> + json_script chart config
 templates/               # project-level templates, shared across apps
-  base.html               # site skeleton: tailwind_css tag, Alpine CDN, nav
+  base.html               # site skeleton: tailwind_css tag, htmx + Alpine CDN, nav
   partials/
     form_errors_modal.html  # Alpine-driven modal for form.errors — see below
   allauth/                # overrides allauth's own template pack — see "Tailwind"
@@ -392,6 +454,8 @@ tests/                  # all tests live here, mirroring apps/ — not inside ea
     test_models.py, test_services.py, test_reconcile_balances.py, test_views.py
   budgets/
     test_models.py, test_services.py, test_views.py
+  analytics/
+    test_services.py, test_views.py
 manage.py
 ```
 

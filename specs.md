@@ -310,4 +310,32 @@ reference; full rationale for each lives in `CLAUDE.md`.
   pattern as Account/Category), never a hard delete — `BudgetPeriod` rows must survive for
   history. Admin for both models is fully read-only, same rationale as `TransactionAdmin`.
 
+### Milestone 6 (Dashboard + analytics)
+- Charting library: Chart.js, loaded via CDN `<script>` tag the same way Alpine.js already
+  is — resolves the Analytics section's "choose and justify" instruction. No Node/npm
+  toolchain needed; loaded only from the dashboard template, not globally.
+- Time-series bucketing: automatic based on the selected range's span — daily up to ~60
+  days, weekly up to ~180, monthly beyond — so a chart stays readable at any range width.
+- Each of the six required charts (expense by category over time, income vs expense trend,
+  net cash flow, top spending categories, per-account balance history, budget vs actual) is
+  its own independent HTMX fragment with its own URL; a shared filter form (date range +
+  Month/Quarter/Year presets) drives all six requests. Resolves `CLAUDE.md`'s note that this
+  milestone was HTMX's first real use; it's now loaded globally in `base.html`.
+- Default range on first load: current month-to-date, matching the "Month" preset.
+- `apps.analytics` has no models — every chart is computed via DB aggregation (`Sum`/
+  `Case`/`When`/`Trunc*`), per the Analytics section's rule against Python loops over the
+  ledger. The one exception, `account_balance_history`'s running-total walk, operates over
+  the small pre-aggregated bucket list, not the ledger.
+- `apps.transactions.services.signed_amount_expression()` was extracted from
+  `reconcile_balances`'s Case/When sign logic so the balance-history chart and
+  `reconcile_balances` share one definition instead of two.
+- "Budget vs actual" reports each budget's period *as of* the dashboard's selected "To"
+  date (not always today) — a budget's own scope still governs period boundaries, so a
+  Semi-monthly budget correctly flips halves as the filter changes. If the selected range
+  spans more than one period for that scope (e.g. the default month-to-date view once past
+  the 15th, or any Year-range against a Monthly budget), every period the range touches is
+  summed and the row is labeled "(combined)" so it reads as an aggregate, not a single
+  period's real figure. A Semi-monthly `BudgetDefinition` can also carry a different amount
+  per half via an optional `second_half_amount` (defaults to the same as the first half).
+
 Start with the plan.

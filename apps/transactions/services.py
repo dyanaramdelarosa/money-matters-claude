@@ -1,6 +1,23 @@
 from django.db import transaction as db_transaction
+from django.db.models import Case, DecimalField, F, When
 
-from .models import Transaction
+from .models import Transaction, TransactionType
+
+
+def signed_amount_expression():
+    """The signed balance delta for a transaction's primary `account` leg
+    (positive for INCOME/ADJUSTMENT, negative for EXPENSE/TRANSFER-out) as a
+    DB expression, for use inside Sum(...) aggregates. A TRANSFER's
+    destination leg is always a plain +amount on `transfer_to_account` and
+    isn't part of this expression — see reconcile_balances._expected_balance()
+    and apps.analytics.services.account_balance_history() for how callers add
+    that second leg in separately.
+    """
+    return Case(
+        When(type__in=[TransactionType.INCOME, TransactionType.ADJUSTMENT], then=F("amount")),
+        default=-F("amount"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
 
 
 def _apply(effects):

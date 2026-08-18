@@ -3,10 +3,10 @@
 A personal budgeting web application. See `specs.md` for the full product spec and
 `CLAUDE.md` for architecture, domain rules, and conventions.
 
-> This README covers Milestones 1-5 (scaffold, auth, accounts/categories CRUD,
-> transactions CRUD including transfers, budgets with period materialization) plus the
-> post-Milestone-4 additions listed below. Docker Compose, seed data, and full deployment
-> notes land in a later milestone (see `specs.md` Milestones list).
+> This README covers Milestones 1-6 (scaffold, auth, accounts/categories CRUD,
+> transactions CRUD including transfers, budgets with period materialization, dashboard +
+> analytics) plus the post-Milestone-4 additions listed below. Docker Compose, seed data,
+> and full deployment notes land in a later milestone (see `specs.md` Milestones list).
 
 ## Quickstart
 
@@ -38,6 +38,10 @@ From there:
   scoped semi-monthly, monthly, or annually. The list shows each budget's current-period
   spent/remaining/percent-used; editing the amount only affects the current and future
   periods, never an already-closed one.
+- `/dashboard/` — expense by category over time, income vs expense trend, net cash flow,
+  top spending categories, per-account balance history, and budget vs actual, all filterable
+  by an arbitrary date range or a Month/Quarter/Year preset. Each chart is its own
+  independent HTMX-loaded card.
 
 Visit `http://127.0.0.1:8000/healthz/` — should return `{"status": "ok"}`.
 

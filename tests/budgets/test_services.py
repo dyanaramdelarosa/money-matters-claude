@@ -98,6 +98,58 @@ def test_editing_amount_updates_the_current_open_period_immediately():
         assert june_period.amount == Decimal("650")
 
 
+def test_get_or_create_period_snapshots_second_half_amount_for_the_second_half():
+    definition = BudgetDefinitionFactory(
+        scope=BudgetScope.SEMI_MONTHLY, amount=Decimal("20000"), second_half_amount=Decimal("10000")
+    )
+
+    with freeze_time("2026-06-05"):
+        first_half = services.get_or_create_period(definition)
+    with freeze_time("2026-06-20"):
+        second_half = services.get_or_create_period(definition)
+
+    assert first_half.amount == Decimal("20000")
+    assert second_half.amount == Decimal("10000")
+
+
+def test_get_or_create_period_second_half_falls_back_to_amount_when_unset():
+    definition = BudgetDefinitionFactory(scope=BudgetScope.SEMI_MONTHLY, amount=Decimal("500"))
+
+    with freeze_time("2026-06-20"):
+        second_half = services.get_or_create_period(definition)
+
+    assert second_half.amount == Decimal("500")
+
+
+def test_editing_second_half_amount_does_not_touch_an_already_open_first_half_period():
+    definition = BudgetDefinitionFactory(scope=BudgetScope.SEMI_MONTHLY, amount=Decimal("20000"))
+
+    with freeze_time("2026-06-05"):
+        first_half = services.get_or_create_period(definition)
+        services.update_definition_amount(definition, Decimal("20000"), Decimal("10000"))
+        first_half.refresh_from_db()
+
+        assert first_half.amount == Decimal("20000")
+
+    with freeze_time("2026-06-20"):
+        second_half = services.get_or_create_period(definition)
+        assert second_half.amount == Decimal("10000")
+
+
+def test_editing_amount_without_second_half_amount_clears_an_existing_split():
+    definition = BudgetDefinitionFactory(
+        scope=BudgetScope.SEMI_MONTHLY, amount=Decimal("20000"), second_half_amount=Decimal("10000")
+    )
+
+    with freeze_time("2026-06-20"):
+        services.update_definition_amount(definition, Decimal("15000"))
+        definition.refresh_from_db()
+        period = services.get_or_create_period(definition)
+
+    assert definition.second_half_amount is None
+    assert period.amount == Decimal("15000")
+
+
 def test_spent_for_period_sums_matching_category_expenses_only():
     profile = ProfileFactory()
     definition = BudgetDefinitionFactory(

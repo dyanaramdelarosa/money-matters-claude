@@ -42,6 +42,16 @@ class BudgetDefinition(TimeStampedModel):
     )
     scope = models.CharField(max_length=20, choices=BudgetScope.choices)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
+    second_half_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "Semi-monthly only: a different amount for the 16th-end-of-month "
+            "half. Leave blank to use the same amount as the first half."
+        ),
+    )
     is_archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
 
@@ -71,6 +81,14 @@ class BudgetDefinition(TimeStampedModel):
             raise ValidationError({"category": "Category must belong to you."})
         if self.category_id and self.category.kind != CategoryKind.EXPENSE:
             raise ValidationError({"category": "Budgets can only be set on expense categories."})
+        if self.second_half_amount is not None and self.scope != BudgetScope.SEMI_MONTHLY:
+            raise ValidationError(
+                {
+                    "second_half_amount": (
+                        "Only a semi-monthly budget can have a separate second-half amount."
+                    )
+                }
+            )
 
     def archive(self):
         self.is_archived = True

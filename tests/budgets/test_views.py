@@ -112,6 +112,82 @@ def test_edit_budget_amount_updates_current_period(client):
         assert period.amount == Decimal("750.00")
 
 
+def test_create_semi_monthly_budget_with_a_second_half_amount(client):
+    profile = ProfileFactory()
+    category = CategoryFactory(user=profile.user, kind=CategoryKind.EXPENSE)
+    client.force_login(profile.user)
+
+    response = client.post(
+        reverse("budgets:create"),
+        {
+            "category": category.pk,
+            "scope": BudgetScope.SEMI_MONTHLY,
+            "amount": "20000.00",
+            "second_half_amount": "10000.00",
+        },
+    )
+
+    assert response.status_code == 302
+    definition = BudgetDefinition.objects.get(user=profile.user, category=category)
+    assert definition.amount == Decimal("20000.00")
+    assert definition.second_half_amount == Decimal("10000.00")
+
+
+def test_create_monthly_budget_rejects_a_second_half_amount(client):
+    profile = ProfileFactory()
+    category = CategoryFactory(user=profile.user, kind=CategoryKind.EXPENSE)
+    client.force_login(profile.user)
+
+    response = client.post(
+        reverse("budgets:create"),
+        {
+            "category": category.pk,
+            "scope": BudgetScope.MONTHLY,
+            "amount": "500.00",
+            "second_half_amount": "300.00",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.context["form"].errors
+    assert not BudgetDefinition.objects.filter(user=profile.user, category=category).exists()
+
+
+def test_edit_semi_monthly_budget_updates_both_halves(client):
+    profile = ProfileFactory()
+    definition = BudgetDefinitionFactory(
+        user=profile.user, scope=BudgetScope.SEMI_MONTHLY, amount=Decimal("20000")
+    )
+    client.force_login(profile.user)
+
+    with freeze_time("2026-06-05"):
+        first_half = get_or_create_period(definition)
+        response = client.post(
+            reverse("budgets:edit", kwargs={"pk": definition.pk}),
+            {"amount": "20000.00", "second_half_amount": "10000.00"},
+        )
+        assert response.status_code == 302
+
+        definition.refresh_from_db()
+        assert definition.second_half_amount == Decimal("10000.00")
+        first_half.refresh_from_db()
+        assert first_half.amount == Decimal("20000.00")
+
+    with freeze_time("2026-06-20"):
+        second_half = get_or_create_period(definition)
+        assert second_half.amount == Decimal("10000.00")
+
+
+def test_edit_monthly_budget_form_has_no_second_half_amount_field(client):
+    profile = ProfileFactory()
+    definition = BudgetDefinitionFactory(user=profile.user, scope=BudgetScope.MONTHLY)
+    client.force_login(profile.user)
+
+    response = client.get(reverse("budgets:edit", kwargs={"pk": definition.pk}))
+
+    assert "second_half_amount" not in response.context["form"].fields
+
+
 def test_edit_budget_cross_user_404(client):
     profile = ProfileFactory()
     other_profile = ProfileFactory()
