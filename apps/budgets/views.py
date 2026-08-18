@@ -78,7 +78,11 @@ class BudgetUpdateView(LoginRequiredMixin, UpdateView):
         return BudgetDefinition.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
-        update_definition_amount(self.object, form.cleaned_data["amount"])
+        update_definition_amount(
+            self.object,
+            form.cleaned_data["amount"],
+            form.cleaned_data.get("second_half_amount"),
+        )
         return redirect(self.get_success_url())
 
 

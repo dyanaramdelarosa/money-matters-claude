@@ -1,0 +1,9 @@
+<h2 class="mb-4 text-lg font-semibold text-slate-900">Per-Account Balance History</h2>
+{% if has_data %}
+    <div class="h-64">
+        <canvas data-chart="chart-account-balance-history-data" id="chart-account-balance-history"></canvas>
+    </div>
+    {{ chart|json_script:"chart-account-balance-history-data" }}
+{% else %}
+    <p class="text-sm text-slate-500">No active accounts yet.</p>
+{% endif %}

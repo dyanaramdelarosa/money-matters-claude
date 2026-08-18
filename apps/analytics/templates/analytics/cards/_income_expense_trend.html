@@ -1,0 +1,9 @@
+<h2 class="mb-4 text-lg font-semibold text-slate-900">Income vs Expense Trend</h2>
+{% if has_data %}
+    <div class="h-64">
+        <canvas data-chart="chart-income-expense-trend-data" id="chart-income-expense-trend"></canvas>
+    </div>
+    {{ chart|json_script:"chart-income-expense-trend-data" }}
+{% else %}
+    <p class="text-sm text-slate-500">No income or expenses in this range.</p>
+{% endif %}

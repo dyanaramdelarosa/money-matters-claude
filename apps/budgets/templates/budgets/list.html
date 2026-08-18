@@ -16,11 +16,11 @@
                     <tr>
                         <th class="w-[20%] px-6 py-3 text-left font-medium text-slate-500">Category</th>
                         <th class="w-[15%] px-6 py-3 text-left font-medium text-slate-500">Scope</th>
-                        <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Budgeted</th>
+                        <th class="w-[16%] px-6 py-3 text-right font-medium text-slate-500">Budgeted</th>
                         <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Spent</th>
                         <th class="w-[13%] px-6 py-3 text-right font-medium text-slate-500">Remaining</th>
                         <th class="w-[11%] px-6 py-3 text-right font-medium text-slate-500">% Used</th>
-                        <th class="w-[15%] px-6 py-3"></th>
+                        <th class="w-[12%] px-6 py-3"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -28,7 +28,13 @@
                         <tr>
                             <td class="px-6 py-3 truncate">{{ row.definition.category.name|default:"Overall" }}</td>
                             <td class="px-6 py-3">{{ row.definition.get_scope_display }}</td>
-                            <td class="px-6 py-3 text-right tabular-nums">{{ row.period.amount|money:base_currency }}</td>
+                            <td class="px-6 py-3 text-right tabular-nums">
+                                {{ row.period.amount|money:base_currency }}
+                                {% if row.definition.second_half_amount is not None %}
+                                    <span class="block text-xs text-slate-400">1st {{ row.definition.amount|money:base_currency }}</span>
+                                    <span class="block text-xs text-slate-400">2nd {{ row.definition.second_half_amount|money:base_currency }}</span>
+                                {% endif %}
+                            </td>
                             <td class="px-6 py-3 text-right tabular-nums">{{ row.spent|money:base_currency }}</td>
                             <td class="px-6 py-3 text-right tabular-nums {% if row.remaining < 0 %}text-red-600{% endif %}">{{ row.remaining|money:base_currency }}</td>
                             <td class="px-6 py-3 text-right tabular-nums">

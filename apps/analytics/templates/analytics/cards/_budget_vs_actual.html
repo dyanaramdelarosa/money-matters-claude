@@ -1,0 +1,34 @@
+{% load money %}
+<h2 class="mb-1 text-lg font-semibold text-slate-900">Budget vs Actual</h2>
+<p class="mb-4 text-xs text-slate-500">Each budget's period as of the selected "To" date — a Monthly/Annual budget's period may still span beyond it.</p>
+{% if has_data %}
+    <div class="h-56">
+        <canvas data-chart="chart-budget-vs-actual-data" id="chart-budget-vs-actual"></canvas>
+    </div>
+    {{ chart|json_script:"chart-budget-vs-actual-data" }}
+    <table class="mt-4 w-full text-sm">
+        <thead>
+            <tr class="text-left text-slate-500">
+                <th class="py-1 font-medium">Budget</th>
+                <th class="py-1 text-right font-medium">Remaining</th>
+                <th class="py-1 text-right font-medium">% Used</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+                <tr>
+                    <td class="py-1.5 text-slate-700">
+                        {{ row.label }}
+                        <span class="block text-xs text-slate-400">{{ row.scope_label }} &middot; {{ row.period_start|date:"M j" }}–{{ row.period_end|date:"M j" }}</span>
+                    </td>
+                    <td class="py-1.5 text-right tabular-nums {% if row.remaining < 0 %}text-red-600{% endif %}">{{ row.remaining|money:base_currency }}</td>
+                    <td class="py-1.5 text-right tabular-nums">
+                        {% if row.percent_used is not None %}{{ row.percent_used|floatformat:0 }}%{% else %}—{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-sm text-slate-500">No active budgets yet.</p>
+{% endif %}

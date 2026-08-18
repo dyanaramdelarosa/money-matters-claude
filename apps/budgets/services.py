@@ -33,30 +33,54 @@ def get_or_create_period(definition, for_date=None):
     doesn't exist yet. Reused on every later read of that same period, so
     once created its amount is frozen until update_definition_amount()
     explicitly re-syncs it (only while the period is still open).
+
+    A semi-monthly definition with a `second_half_amount` set snapshots that
+    figure instead, but only onto the 16th-end-of-month half — the first
+    half always snapshots `amount`.
     """
     for_date = for_date or timezone.localdate()
     start, end = period_bounds(definition.scope, for_date)
+    amount = definition.amount
+    if (
+        definition.scope == BudgetScope.SEMI_MONTHLY
+        and start.day >= 16
+        and definition.second_half_amount is not None
+    ):
+        amount = definition.second_half_amount
     period, _ = BudgetPeriod.objects.get_or_create(
         definition=definition,
         period_start=start,
-        defaults={"period_end": end, "user": definition.user, "amount": definition.amount},
+        defaults={"period_end": end, "user": definition.user, "amount": amount},
     )
     return period
 
 
-def update_definition_amount(definition, new_amount):
+def update_definition_amount(definition, new_amount, second_half_amount=None):
     """Editing affects the current (open) period and any future ones
     immediately; already-closed periods (period_end < today) are left
     untouched — that's what makes historical reports immutable.
+
+    `second_half_amount` only matters for a semi-monthly definition — pass
+    None (the default) to keep both halves at `new_amount`, matching every
+    non-semi-monthly scope where the field is always null.
     """
     today = timezone.localdate()
     with db_transaction.atomic():
         definition.amount = new_amount
+        definition.second_half_amount = second_half_amount
         definition.full_clean()
-        definition.save(update_fields=["amount", "updated_at"])
-        BudgetPeriod.objects.filter(definition=definition, period_end__gte=today).update(
-            amount=new_amount
-        )
+        definition.save(update_fields=["amount", "second_half_amount", "updated_at"])
+        if definition.scope == BudgetScope.SEMI_MONTHLY:
+            BudgetPeriod.objects.filter(
+                definition=definition, period_end__gte=today, period_start__day=1
+            ).update(amount=new_amount)
+            BudgetPeriod.objects.filter(
+                definition=definition, period_end__gte=today, period_start__day=16
+            ).update(amount=second_half_amount if second_half_amount is not None else new_amount)
+        else:
+            BudgetPeriod.objects.filter(definition=definition, period_end__gte=today).update(
+                amount=new_amount
+            )
     return definition
 
 

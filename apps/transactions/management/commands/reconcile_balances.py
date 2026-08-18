@@ -3,10 +3,11 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import transaction as db_transaction
-from django.db.models import Case, DecimalField, F, Sum, When
+from django.db.models import Sum
 
 from apps.accounts.models import Account
 from apps.transactions.models import Transaction, TransactionType
+from apps.transactions.services import signed_amount_expression
 
 
 class Command(BaseCommand):
@@ -54,16 +55,7 @@ class Command(BaseCommand):
 
     def _expected_balance(self, account):
         primary = Transaction.objects.filter(account=account).aggregate(
-            total=Sum(
-                Case(
-                    When(
-                        type__in=[TransactionType.INCOME, TransactionType.ADJUSTMENT],
-                        then=F("amount"),
-                    ),
-                    default=-F("amount"),
-                    output_field=DecimalField(max_digits=14, decimal_places=2),
-                )
-            )
+            total=Sum(signed_amount_expression())
         )["total"] or Decimal("0.00")
         incoming_transfers = Transaction.objects.filter(
             transfer_to_account=account, type=TransactionType.TRANSFER

@@ -1,0 +1,13 @@
+{% load money %}
+<h2 class="mb-2 text-lg font-semibold text-slate-900">Net Cash Flow</h2>
+<p class="mb-4 text-2xl font-semibold tabular-nums {% if total_net < 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
+    {{ total_net|money:base_currency }}
+</p>
+{% if has_data %}
+    <div class="h-56">
+        <canvas data-chart="chart-net-cash-flow-data" id="chart-net-cash-flow"></canvas>
+    </div>
+    {{ chart|json_script:"chart-net-cash-flow-data" }}
+{% else %}
+    <p class="text-sm text-slate-500">No activity in this range.</p>
+{% endif %}

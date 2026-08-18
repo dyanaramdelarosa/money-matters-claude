@@ -1,0 +1,18 @@
+{% load money %}
+<h2 class="mb-4 text-lg font-semibold text-slate-900">Top Spending Categories</h2>
+{% if has_data %}
+    <div class="h-56">
+        <canvas data-chart="chart-top-categories-data" id="chart-top-categories"></canvas>
+    </div>
+    {{ chart|json_script:"chart-top-categories-data" }}
+    <ul class="mt-4 divide-y divide-slate-100 text-sm">
+        {% for row in rows %}
+            <li class="flex items-center justify-between py-2">
+                <span class="text-slate-700">{{ row.category__name|default:"Uncategorized" }}</span>
+                <span class="tabular-nums text-slate-900">{{ row.total|money:base_currency }}</span>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-sm text-slate-500">No expenses in this range.</p>
+{% endif %}
